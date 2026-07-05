@@ -93,6 +93,11 @@ def _run_script_generation(research_data, target_duration=420.0):
     print(f"\n{'-'*60}", file=sys.stderr)
     print("[Script] Generating Vox-style narration (Hook->Context->Mechanism->Twist)...", file=sys.stderr)
     gen = ScriptGenerator(use_llm=False, target_duration=target_duration)
+    if not research_data.get("facts"):
+        print("[Script] No facts found - generating topic-based script.", file=sys.stderr)
+        topic = research_data.get("topic", "")
+        research_data["facts"] = [{"claim": "This explainer explores " + topic, "confidence": 0.5, "source_name": "auto-generated"}]
+        research_data["key_narrative"] = research_data.get("key_narrative") or ("An exploration of " + topic)
     output = gen.generate(research_data)
     script_dict = asdict(output)
     n_segments = len(script_dict.get("segments", []))
