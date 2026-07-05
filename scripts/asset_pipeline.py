@@ -101,6 +101,16 @@ class AssetCurator:
             fn = f"{prefix}{ext}"; dest = self.output_dir / fn
             if dest.exists(): return dest
             urlretrieve(url, dest)
+            # Validate it's actually an image (not HTML 404 page)
+            if dest.stat().st_size < 100:
+                dest.unlink(); return None
+            with open(dest, 'rb') as f:
+                header = f.read(12)
+            valid = header[:3] == b'\xff\xd8\xff' or header[:4] == b'\x89PNG' or header[:4] == b'RIFF' or header[:4] == b'GIF8'
+            if not valid:
+                dest.unlink()
+                print(f"[Assets] Downloaded file is not a valid image: {url[:80]}...", file=sys.stderr)
+                return None
             return dest
         except Exception as e:
             print(f"[Assets] Failed to download {url}: {e}", file=sys.stderr)
