@@ -40,3 +40,17 @@
 - Wrapper: `scripts/utils/tts.py`
 - Model downloaded on first use, cached in `~/.cache/video-pipeline/kokoro/`
 - Each invocation: load → synthesize → unload → cleanup
+
+## Update: 2026-07-05 — Kokoro Successfully Installed
+
+Kokoro-82M installed via `pip install kokoro` (v0.9.4). End-to-end synthesis tested and working:
+
+- **Dependencies**: torch 2.12.1, transformers 5.13.0, spacy 3.8.14, soundfile 0.14.0
+- **Synthesize test**: "This is a test of the Kokoro TTS system" → 6.2s WAV, 24kHz mono 16-bit PCM
+- **Segments test**: Multi-segment batch synthesis working with auto-created output dirs
+- **Voice**: af_heart (default), all Kokoro voices available
+- **No Piper fallback needed** — Kokoro installed and fully functional
+
+### Fixes Applied
+- `synthesize_segments()` now auto-creates `output_dir` via `os.makedirs(output_dir, exist_ok=True)`
+- `requirements.txt`: widened `soundfile` constraint from `<0.13` to `<1.0` (installed 0.14.0)

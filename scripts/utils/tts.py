@@ -171,6 +171,8 @@ class KokoroTTS:
         if output_dir is None:
             import tempfile
             output_dir = tempfile.mkdtemp(prefix="kokoro_segments_")
+        else:
+            os.makedirs(output_dir, exist_ok=True)
 
         results = []
         cumulative_offset = 0.0
