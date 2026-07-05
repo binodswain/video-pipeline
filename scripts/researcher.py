@@ -1,16 +1,42 @@
 #!/usr/bin/env python3
-"""Researcher Agent -- Sprint 1: fact-checked web research with provenance."""
-import argparse, json, re, sys, time
+"""Researcher Agent -- Sprint 1: fact-checked web research with provenance.
+
+Search backends (auto-detected in priority order):
+  1. Hermes web_search (when running inside Hermes)
+  2. ddgs (new DuckDuckGo package, pip install ddgs)
+  3. duckduckgo_search (legacy, deprecated — renamed to ddgs)
+  4. DuckDuckGo HTML scraping (plain HTTP, no API key needed)
+"""
+import argparse, json, re, sys, time, warnings
+from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+# ── DDGS imports (new and legacy) ──────────────────────────────────────────
 try:
-    from duckduckgo_search import DDGS; HAS_DDGS = True
+    from ddgs import DDGS as DDGS_NEW; HAS_DDGS_NEW = True
 except ImportError:
-    HAS_DDGS = False
+    DDGS_NEW = None; HAS_DDGS_NEW = False
+
+try:
+    from duckduckgo_search import DDGS as DDGS_LEGACY; HAS_DDGS_LEGACY = True
+except ImportError:
+    DDGS_LEGACY = None; HAS_DDGS_LEGACY = False
+
+# Backward-compat alias (old code may check HAS_DDGS)
+HAS_DDGS = HAS_DDGS_NEW or HAS_DDGS_LEGACY
+
+# ── Hermes agent integration ──────────────────────────────────────────────
+try:
+    from hermes_tools import web_search as _hermes_web_search
+    HAS_HERMES_WEB_SEARCH = True
+except ImportError:
+    _hermes_web_search = None; HAS_HERMES_WEB_SEARCH = False
+
+# ── Content extraction imports ────────────────────────────────────────────
 try:
     import trafilatura; HAS_TRAFILATURA = True
 except ImportError:
@@ -31,6 +57,201 @@ DEFAULT_MAX_SEARCH_RESULTS = 5
 REQUEST_TIMEOUT = 12
 SEARCH_SLEEP = 0.5
 MAX_FACTS_PER_SOURCE = 50
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Search Backend System
+# ═══════════════════════════════════════════════════════════════════════════
+
+class SearchBackend(ABC):
+    """Abstract base for pluggable search backends."""
+
+    @abstractmethod
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        """Return list of {'title','url','snippet'} dicts."""
+        ...
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Human-readable backend name."""
+        ...
+
+    def available(self) -> bool:
+        """Whether this backend can be used right now."""
+        return True
+
+
+class HermesWebSearchBackend(SearchBackend):
+    """Use Hermes Agent's built-in web_search tool (only inside Hermes)."""
+
+    @property
+    def name(self) -> str:
+        return "hermes-web-search"
+
+    def available(self) -> bool:
+        return HAS_HERMES_WEB_SEARCH
+
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        results = []
+        try:
+            raw = _hermes_web_search(query=query, limit=max_results)
+            for r in (raw or []):
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "snippet": r.get("description", r.get("snippet", "")),
+                })
+        except Exception as e:
+            print(f"[WARN] Hermes web_search error: {e}", file=sys.stderr)
+        return results
+
+
+class DDGSBackend(SearchBackend):
+    """Use the new `ddgs` package (pip install ddgs)."""
+
+    @property
+    def name(self) -> str:
+        return "ddgs"
+
+    def available(self) -> bool:
+        return HAS_DDGS_NEW
+
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        results = []
+        try:
+            with DDGS_NEW() as ddgs:
+                for r in ddgs.text(query, max_results=max_results):
+                    results.append({
+                        "title": r.get("title", ""),
+                        "url": r.get("href", ""),
+                        "snippet": r.get("body", ""),
+                    })
+        except Exception as e:
+            print(f"[WARN] ddgs search error: {e}", file=sys.stderr)
+        return results
+
+
+class LegacyDDGSBackend(SearchBackend):
+    """Fall back to deprecated `duckduckgo_search` with a warning."""
+
+    @property
+    def name(self) -> str:
+        return "duckduckgo_search (legacy)"
+
+    def available(self) -> bool:
+        return HAS_DDGS_LEGACY
+
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        results = []
+        warnings.warn(
+            "Using deprecated `duckduckgo_search` package. "
+            "Install `ddgs` instead: pip install ddgs",
+            RuntimeWarning,
+        )
+        try:
+            with DDGS_LEGACY() as ddgs:
+                for r in ddgs.text(query, max_results=max_results):
+                    results.append({
+                        "title": r.get("title", ""),
+                        "url": r.get("href", ""),
+                        "snippet": r.get("body", ""),
+                    })
+        except Exception as e:
+            print(f"[WARN] legacy duckduckgo_search error: {e}", file=sys.stderr)
+        return results
+
+
+class DDGHTMLBackend(SearchBackend):
+    """Scrape DuckDuckGo's HTML search endpoint (no API key, no rate-limiting)."""
+
+    DDG_HTML_URL = "https://html.duckduckgo.com/html/"
+
+    @property
+    def name(self) -> str:
+        return "duckduckgo-html"
+
+    def available(self) -> bool:
+        return HAS_BS4
+
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+        results = []
+        try:
+            resp = requests.post(
+                self.DDG_HTML_URL,
+                data={"q": query},
+                timeout=REQUEST_TIMEOUT,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-US,en;q=0.5",
+                },
+            )
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "lxml")
+            for el in soup.select(".result")[:max_results]:
+                title_el = el.select_one(".result__title")
+                url_el = el.select_one(".result__url")
+                snippet_el = el.select_one(".result__snippet")
+
+                title = title_el.get_text(strip=True) if title_el else ""
+                url_raw = url_el.get_text(strip=True) if url_el else ""
+                snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+
+                # Extract the real href from the <a> tag
+                link_el = el.select_one("a.result__a")
+                url = link_el.get("href", "") if link_el else ""
+
+                # DDG HTML encodes the real URL in a redirect param
+                if url and "uddg=" in url:
+                    from urllib.parse import parse_qs, unquote
+                    parsed = parse_qs(urlparse(url).query)
+                    uddg = parsed.get("uddg", [""])[0]
+                    if uddg:
+                        url = unquote(uddg)
+
+                results.append({
+                    "title": title,
+                    "url": url or url_raw,
+                    "snippet": snippet,
+                })
+        except Exception as e:
+            print(f"[WARN] DuckDuckGo HTML scrape error: {e}", file=sys.stderr)
+        return results
+
+
+# ── Backend registry & auto-detection ─────────────────────────────────────
+
+_SEARCH_BACKENDS: List[SearchBackend] = [
+    HermesWebSearchBackend(),
+    DDGSBackend(),
+    LegacyDDGSBackend(),
+    DDGHTMLBackend(),
+]
+
+def get_search_backend(preferred: Optional[str] = None) -> SearchBackend:
+    """Return the first available backend, optionally preferring a named one."""
+    if preferred:
+        for b in _SEARCH_BACKENDS:
+            if b.name == preferred and b.available():
+                return b
+    for b in _SEARCH_BACKENDS:
+        if b.available():
+            return b
+    raise RuntimeError(
+        "No search backend available. Install one of: `pip install ddgs`, "
+        "`pip install duckduckgo_search`, or `pip install beautifulsoup4`."
+    )
+
+def list_backends() -> List[Dict[str, Any]]:
+    """Return info about all registered backends for diagnostics."""
+    return [
+        {"name": b.name, "available": b.available()}
+        for b in _SEARCH_BACKENDS
+    ]
+
 
 @dataclass
 class Fact:
@@ -61,13 +282,15 @@ class ResearchOutput:
     visual_leads: List[VisualLead] = field(default_factory=list)
     contested_flags: List[ContestedFlag] = field(default_factory=list)
     methodology_note: str = ""
+    search_backend_used: str = ""
     def to_dict(self):
         return {"topic":self.topic,"researched_at":self.researched_at,
                 "facts":[f.to_dict() for f in self.facts],
                 "source_summary":self.source_summary,"key_narrative":self.key_narrative,
                 "visual_leads":[v.to_dict() for v in self.visual_leads],
                 "contested_flags":[c.to_dict() for c in self.contested_flags],
-                "methodology_note":self.methodology_note}
+                "methodology_note":self.methodology_note,
+                "search_backend_used":self.search_backend_used}
     def to_json(self, indent=2):
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
@@ -104,26 +327,15 @@ def _assess_source_reliability(url, site_name=""):
     if any(kw in site_name.lower() for kw in ["news","times","post","journal","daily"]): return ("news",0.65)
     return ("unknown", 0.30)
 
-def _web_search(topic, max_results=DEFAULT_MAX_SEARCH_RESULTS):
-    if not HAS_DDGS: return []
-    results = []
-    try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(topic, max_results=max_results):
-                results.append({"title":r.get("title",""),"url":r.get("href",""),"snippet":r.get("body","")})
-    except Exception as e:
-        print(f"[WARN] Search error: {e}", file=sys.stderr)
-    return results
+def _web_search(topic, max_results=DEFAULT_MAX_SEARCH_RESULTS, backend=None):
+    """Search the web using the best available backend."""
+    b = backend or get_search_backend()
+    return b.search(topic, max_results=max_results)
 
-def _search_x(topic):
-    if not HAS_DDGS: return []
-    results = []
-    try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(f"site:x.com {topic}", max_results=3):
-                results.append({"title":r.get("title",""),"url":r.get("href",""),"snippet":r.get("body","")})
-    except: pass
-    return results
+def _search_x(topic, backend=None):
+    """Search X/Twitter via site:x.com query."""
+    b = backend or get_search_backend()
+    return b.search(f"site:x.com {topic}", max_results=3)
 
 def _web_extract(url, session):
     if not HAS_TRAFILATURA: return None
@@ -338,51 +550,112 @@ def _extract_visual_leads(sources):
             leads.append(VisualLead(url=u,description=alt or ctx[:200] or "Image",source_url=src.get("url",""),image_type=_classify_image_type(u,alt,ctx),license_note="Verify license before use."))
     return leads
 
-def research(topic, max_sources=DEFAULT_MAX_SOURCES, include_x=True, verbose=False):
+def research(topic, max_sources=DEFAULT_MAX_SOURCES, include_x=True, verbose=False,
+             search_backend: Optional[str] = None):
+    """Run fact-checked web research on a topic.
+
+    Args:
+        topic: The topic to research.
+        max_sources: Maximum number of sources to extract and analyse.
+        include_x: Whether to also search X/Twitter.
+        verbose: Print progress to stderr.
+        search_backend: Optional backend name to force a specific backend.
+            One of: 'hermes-web-search', 'ddgs', 'duckduckgo_search (legacy)',
+            'duckduckgo-html'.  Auto-detected if None.
+
+    Returns:
+        ResearchOutput dataclass with facts, source summary, etc.
+    """
     started = datetime.now(timezone.utc)
-    output = ResearchOutput(topic=topic, researched_at=started.isoformat(),
-        methodology_note="Automated pipeline: DuckDuckGo search, trafilatura extraction, heuristic fact extraction, cross-verification by Jaccard similarity >= 0.4, confidence based on source reliability and corroboration. Verify independently before production use.")
+    backend = get_search_backend(preferred=search_backend)
+
+    output = ResearchOutput(
+        topic=topic,
+        researched_at=started.isoformat(),
+        methodology_note=(
+            "Automated pipeline: DuckDuckGo search, trafilatura extraction, "
+            "heuristic fact extraction, cross-verification by Jaccard "
+            "similarity >= 0.4, confidence based on source reliability and "
+            "corroboration. Verify independently before production use."
+        ),
+        search_backend_used=backend.name,
+    )
+
     session = _create_session()
     all_extracted = []; all_facts = []
-    if verbose: print(f"[1/5] Searching: {topic}", file=sys.stderr)
-    search_results = _web_search(topic, max_results=max_sources*2)
-    if include_x and HAS_DDGS:
-        if verbose: print("[2/5] Searching X/Twitter...", file=sys.stderr)
-        search_results.extend(_search_x(topic))
+
+    if verbose:
+        print(f"[1/5] Searching ({backend.name}): {topic}", file=sys.stderr)
+
+    search_results = _web_search(topic, max_results=max_sources * 2, backend=backend)
+
+    if include_x:
+        try:
+            if verbose:
+                print("[2/5] Searching X/Twitter...", file=sys.stderr)
+            search_results.extend(_search_x(topic, backend=backend))
+        except Exception as e:
+            if verbose:
+                print(f"[WARN] X search skipped: {e}", file=sys.stderr)
+
     if not search_results:
         output.key_narrative = f"No results found for '{topic}'."
         return output
+
     seen = set(); unique = []
     for r in search_results:
-        u = r.get("url","")
-        if u and u not in seen: seen.add(u); unique.append(r)
-    if verbose: print(f"[3/5] Extracting {min(max_sources,len(unique))} sources...", file=sys.stderr)
+        u = r.get("url", "")
+        if u and u not in seen:
+            seen.add(u); unique.append(r)
+
+    if verbose:
+        print(f"[3/5] Extracting {min(max_sources, len(unique))} sources...",
+              file=sys.stderr)
+
     for i, r in enumerate(unique[:max_sources]):
         url = r["url"]
-        if verbose: print(f"  [{i+1}] {url}", file=sys.stderr)
+        if verbose:
+            print(f"  [{i+1}] {url}", file=sys.stderr)
         ex = _web_extract(url, session)
-        if not ex: continue
-        ex["search_title"] = r.get("title",""); ex["search_snippet"] = r.get("snippet","")
-        sn = ex.get("title","") or r.get("title","")
+        if not ex:
+            continue
+        ex["search_title"] = r.get("title", "")
+        ex["search_snippet"] = r.get("snippet", "")
+        sn = ex.get("title", "") or r.get("title", "")
         tier, score = _assess_source_reliability(url, sn)
         ex["reliability_tier"] = tier; ex["reliability_score"] = score
         all_extracted.append(ex)
-        sf = _extract_facts(ex["text"], url, sn[:100], tier, score, ex.get("date","unknown"))
-        if verbose and sf: print(f"    -> {len(sf)} facts", file=sys.stderr)
+        sf = _extract_facts(ex["text"], url, sn[:100], tier, score,
+                           ex.get("date", "unknown"))
+        if verbose and sf:
+            print(f"    -> {len(sf)} facts", file=sys.stderr)
         all_facts.extend(sf)
         time.sleep(SEARCH_SLEEP)
-    if verbose: print(f"[4/5] Cross-verifying {len(all_facts)} raw facts...", file=sys.stderr)
+
+    if verbose:
+        print(f"[4/5] Cross-verifying {len(all_facts)} raw facts...",
+              file=sys.stderr)
     merged = _cross_verify_facts(all_facts)
-    if verbose: print(f"[5/5] Assembling output...", file=sys.stderr)
+    if verbose:
+        print(f"[5/5] Assembling output...", file=sys.stderr)
     merged.sort(key=lambda f: f.confidence, reverse=True)
     output.facts = merged
     output.source_summary = _build_source_summary(all_extracted)
     output.key_narrative = _generate_key_narrative(topic, merged)
     output.visual_leads = _extract_visual_leads(all_extracted)
     output.contested_flags = _identify_contested_flags(merged)
-    elapsed = (datetime.now(timezone.utc)-started).total_seconds()
-    if verbose: print(f"[DONE] {elapsed:.1f}s | {len(output.facts)} facts | {len(output.visual_leads)} visuals | {len(output.contested_flags)} flags", file=sys.stderr)
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+
+    if verbose:
+        print(
+            f"[DONE] {elapsed:.1f}s | {len(output.facts)} facts | "
+            f"{len(output.visual_leads)} visuals | "
+            f"{len(output.contested_flags)} flags | "
+            f"backend: {backend.name}",
+            file=sys.stderr,
+        )
     return output
+
 
 def main():
     parser = argparse.ArgumentParser(description="Researcher Agent - fact-checked web research")
@@ -393,16 +666,35 @@ def main():
     parser.add_argument("--no-x", action="store_true", help="Skip X/Twitter")
     parser.add_argument("--verbose","-v", action="store_true", help="Progress to stderr")
     parser.add_argument("--compact", action="store_true", help="Compact JSON")
+    parser.add_argument("--backend", choices=["hermes-web-search","ddgs","duckduckgo_search (legacy)","duckduckgo-html"], help="Force a specific search backend")
+    parser.add_argument("--list-backends", action="store_true", help="List available search backends and exit")
     args = parser.parse_args()
+
+    if args.list_backends:
+        for info in list_backends():
+            status = "available" if info["available"] else "unavailable"
+            print(f"  {status}: {info['name']}")
+        return
+
     topic = args.topic or args.topic_flag
-    if not topic: parser.error("No topic provided.")
-    result = research(topic=topic, max_sources=args.max_sources, include_x=not args.no_x, verbose=args.verbose)
+    if not topic:
+        parser.error("No topic provided.")
+
+    result = research(
+        topic=topic,
+        max_sources=args.max_sources,
+        include_x=not args.no_x,
+        verbose=args.verbose,
+        search_backend=args.backend,
+    )
     js = result.to_json(indent=None if args.compact else 2)
     if args.output:
-        with open(args.output, "w") as f: f.write(js)
+        with open(args.output, "w") as f:
+            f.write(js)
         print(f"[INFO] Saved to {args.output}", file=sys.stderr)
     else:
         print(js)
+
 
 if __name__ == "__main__":
     main()
