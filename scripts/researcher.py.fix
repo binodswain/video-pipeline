@@ -1,0 +1,21 @@
+# Additional noise filter for [edit] markers from Wikipedia
+_NOISE_PATTERNS = [
+    r"^\s*Archived from the original",
+    r"^\s*Retrieved \d",
+    r"^\s*ISBN \d",
+    r"^\s*New York:",
+    r"^\s*Washington,?\s*D\.?C\.?:",
+    r"^\s*Chicago:",
+    r"^\s*University of",
+    r"^\s*Vol\.\s*\d",
+    r"^\s*pp\.\s*\d",
+    r"^\s*doi:",
+    r"^\s*\\[a-z]+\s",
+    r"^\s*et al\.",
+    r"^\s*Available at:",
+    r"^\s*See also:",
+    r"^\s*Note:",
+    r"^\s*Source:",
+    r"^\s*\d+\.\s*$",
+    r"^\[\d+\]",
+]
