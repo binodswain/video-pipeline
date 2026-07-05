@@ -65,7 +65,9 @@ def build_video(slides, script, output_path, resolution=(1920,1080), fps=24, voi
             font_size = int(resolution[1] * 0.04)
             video_clip = burn_subtitles(video_clip, srt_text, font_size=font_size, position=("center", resolution[1]*0.87), output_size=resolution)
         print(f"[Build] Encoding final MP4 to {output_path}...", file=sys.stderr)
-        video_clip = video_clip.with_audio(audio_path)
+        from moviepy import AudioFileClip
+        audio_clip = AudioFileClip(audio_path)
+        video_clip = video_clip.with_audio(audio_clip)
         video_clip.write_videofile(output_path, fps=fps, codec="libx264", audio_codec="aac", preset="ultrafast", threads=1)
         output_bytes = os.path.getsize(output_path)
         print(f"[Build] OK Complete! {output_bytes/1048576:.1f} MB  |  {audio_duration:.1f}s  |  {len(slides)} slides", file=sys.stderr)
