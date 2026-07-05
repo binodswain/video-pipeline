@@ -212,7 +212,10 @@ class _CrossFadeIn:
     def __init__(self, duration):
         self.duration = duration
 
-    def __call__(self, clip):
+    def copy(self):
+        return _CrossFadeIn(self.duration)
+
+    def apply(self, clip):
         import numpy as np
 
         def make_frame(t):
@@ -231,7 +234,10 @@ class _CrossFadeOut:
     def __init__(self, duration):
         self.duration = duration
 
-    def __call__(self, clip):
+    def copy(self):
+        return _CrossFadeOut(self.duration)
+
+    def apply(self, clip):
         import numpy as np
 
         def make_frame(t):
