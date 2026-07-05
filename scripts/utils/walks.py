@@ -317,7 +317,7 @@ def _burn_text_overlay(clip, text: str, output_size: tuple):
         text=text,
         font_size=font_size,
         color="black",
-        font="DejaVu-Sans-Bold",
+        font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         method="caption",
         size=(int(w * 0.85), None),
     ).with_position(("center", int(h * 0.82))).with_duration(clip.duration)
@@ -327,7 +327,7 @@ def _burn_text_overlay(clip, text: str, output_size: tuple):
         text=text,
         font_size=font_size,
         color="white",
-        font="DejaVu-Sans-Bold",
+        font="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         method="caption",
         size=(int(w * 0.85), None),
     ).with_position(("center", int(h * 0.82) - 2)).with_duration(clip.duration)
