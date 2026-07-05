@@ -5,7 +5,7 @@ import json, os, sys, tempfile
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
-from urlib.request import urlretrieve
+from urllib.request import urlretrieve
 
 ASSETS_DIR = Path.home() / "workspace" / "video-pipeline" / "assets"
 
