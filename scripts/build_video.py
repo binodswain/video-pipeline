@@ -128,11 +128,11 @@ def _run_asset_pipeline(script, research, tempdir, topic=""):
     print("[Assets] Generating image prompts and curating assets...", file=sys.stderr)
     asset_pipeline = AssetPipeline(output_dir=tempdir, style="editorial")
     slides = asset_pipeline.run(script.get("segments", []), research.get("visual_leads", []))
-    has_empty = not slides or all(s.get("path", "") == "" for s in slides)
-    if has_empty:
-        placeholder = Path(tempdir) / "placeholder.png"
-        _create_placeholder_image(placeholder, text=topic, resolution=(1920, 1080))
-        for s in slides:
+    for i, s in enumerate(slides):
+        p = s.get("path", "")
+        if not p or not os.path.exists(p) or os.path.isdir(p):
+            placeholder = Path(tempdir) / f"placeholder_{i:03d}.png"
+            _create_placeholder_image(placeholder, text=topic, resolution=(1920, 1080))
             s["path"] = str(placeholder)
     print(f"[Assets] OK {len(slides)} slides prepared", file=sys.stderr)
     return slides
