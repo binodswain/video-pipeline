@@ -212,14 +212,17 @@ def _create_placeholder_image(path, text="", resolution=(1920, 1080)):
 
 def _create_minimal_png(path, resolution=(1920, 1080)):
     w, h = resolution
-    data = bytearray(w * h * 3)
-    compressor = zlib.compressobj(data, level=9)
+    raw = bytearray(w * h * 3)
+    # Create scanlines (filter byte 0 + pixel data per row)
+    scanlines = b''.join(b'\x00' + bytes(raw[i:i+w*3]) for i in range(0, len(raw), w*3))
+    compressor = zlib.compressobj(level=9)
+    compressed = compressor.compress(scanlines) + compressor.flush()
     def _png_chunk(ctype, d):
-        chunk = ctype + struct.pack(">I", len(d)) + d
+        chunk = struct.pack(">I", len(d)) + ctype + d
         crc = zlib.crc32(chunk) & 0xFFFFFFFF
         return chunk + struct.pack(">I", crc)
-    ihdr = struct.pack(">IIIBBB", w, h, 8, 2, 0, 0, 0)
-    png = b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", ihdr) + _png_chunk(b"IDAT", compressor.flush()) + _png_chunk(b"IEND", b"")
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    png = b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", ihdr) + _png_chunk(b"IDAT", compressed) + _png_chunk(b"IEND", b"")
     with open(path, "wb") as f:
         f.write(png)
 
