@@ -114,6 +114,9 @@ class _ZoomPanEffect:
         self.transform_fn = transform_fn
         self.output_size = output_size
 
+    def copy(self):
+        return _ZoomPanEffect(self.transform_fn, self.output_size)
+
     def __call__(self, clip):
         """Apply the zoom-pan transformation to the clip."""
         from moviepy import VideoClip

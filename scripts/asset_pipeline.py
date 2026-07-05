@@ -56,10 +56,10 @@ class ImagePromptGenerator:
     def _select_style(self, cue, emotion):
         cl = cue.lower()
         if any(w in cl for w in ["data","chart","graph","statistics"]): return self.STYLE_PREFIXES["data"]
-        if any(w in cl for w in ["historical","archive","old","vintage"]): return self.STYLE_PREFIXET["historical"]
-        if any(w in cl for w in ["diagram","mechanism","how it works"]): return self.STYLE_PREFIXET["diagram"]
+        if any(w in cl for w in ["historical","archive","old","vintage"]): return self.STYLE_PREFIXES["historical"]
+        if any(w in cl for w in ["diagram","mechanism","how it works"]): return self.STYLE_PREFIXES["diagram"]
         if any(w in emotion.lower() for w in ["dramatic","intense","surprising"]): return self.STYLE_PREFIXES["dramatic"]
-        return self.STYLE_PREFIXET["editorial"]
+        return self.STYLE_PREFIXES["editorial"]
     def _infer_style_name(self, cue, emotion):
         cl = cue.lower()
         if any(w in cl for w in ["data","chart"]): return "data"
