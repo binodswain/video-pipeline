@@ -1,0 +1,95 @@
+{
+  "topic": "How the Electoral College Actually Works",
+  "key_narrative": "The Electoral College isn't a direct popular vote — it's a state-by-state contest where 538 electors determine the presidency, and the system's quirks mean a candidate can win the presidency while losing the national popular vote.",
+  "source_summary": "Sources include National Archives official data, Pew Research Center analysis, and academic papers. Overall reliability: HIGH. Multiple primary sources cross-verified.",
+  "facts": [
+    {
+      "claim": "The Electoral College has 538 electors — one for each member of Congress plus three for Washington D.C.",
+      "evidence": "Article II, Section 1 of the Constitution, as amended by the 23rd Amendment.",
+      "source_url": "https://www.archives.gov/electoral-college/about",
+      "source_name": "National Archives",
+      "date": "2024-01-15",
+      "confidence": 0.98
+    },
+    {
+      "claim": "A candidate needs 270 electoral votes to win — a simple majority of the 538 total.",
+      "evidence": "This threshold comes from half of 538 (269) plus one. It's not in the Constitution explicitly but is a mathematical consequence of the total.",
+      "source_url": "https://www.archives.gov/electoral-college/faq",
+      "source_name": "National Archives FAQ",
+      "date": "2024-01-15",
+      "confidence": 0.99
+    },
+    {
+      "claim": "Five times in U.S. history, the winner of the Electoral College lost the national popular vote — most recently in 2000 and 2016.",
+      "evidence": "1824, 1876, 1888, 2000, 2016. In 2016, Hillary Clinton won the popular vote by nearly 3 million but lost the Electoral College 304-227.",
+      "source_url": "https://www.pewresearch.org/short-reads/2020/11/06/",
+      "source_name": "Pew Research Center",
+      "date": "2020-11-06",
+      "confidence": 0.97
+    },
+    {
+      "claim": "Most states use a winner-take-all system — the candidate who wins the state's popular vote gets ALL of that state's electoral votes. Only Maine and Nebraska split their votes by congressional district.",
+      "evidence": "48 states + DC use winner-take-all. Maine (since 1972) and Nebraska (since 1992) use the congressional district method.",
+      "source_url": "https://www.archives.gov/electoral-college/allocation",
+      "source_name": "National Archives",
+      "date": "2024-01-15",
+      "confidence": 0.96
+    },
+    {
+      "claim": "Small states have disproportionately more electoral power per voter. A Wyoming resident's vote carries about 3.6 times the weight of a California resident's vote in the Electoral College.",
+      "evidence": "Wyoming has 3 electoral votes for ~580K people (1 elector per 193K). California has 54 electoral votes for ~39M people (1 elector per 722K).",
+      "source_url": "https://www.census.gov/data/tables/time-series/demo/popest/2020s-state-total.html",
+      "source_name": "U.S. Census Bureau",
+      "date": "2023-12-20",
+      "confidence": 0.95
+    },
+    {
+      "claim": "If no candidate reaches 270 electoral votes, the House of Representatives chooses the president — with each state delegation getting ONE vote.",
+      "evidence": "12th Amendment to the Constitution. This has happened twice: 1800 and 1824.",
+      "source_url": "https://constitution.congress.gov/constitution/amendment-12/",
+      "source_name": "Congress.gov",
+      "date": "2024-01-20",
+      "confidence": 0.99
+    },
+    {
+      "claim": "The Electoral College was originally designed as a compromise between letting Congress pick the president and a direct popular election, and it was also influenced by the Three-Fifths Compromise.",
+      "evidence": "At the Constitutional Convention of 1787, Southern states wanted slaves counted for representation (but not taxation), which gave them more electoral votes without extending voting rights.",
+      "source_url": "https://www.history.com/topics/us-presidents/electoral-college",
+      "source_name": "History.com",
+      "date": "2023-10-01",
+      "confidence": 0.90
+    },
+    {
+      "claim": "Over 700 proposals have been introduced in Congress to reform or abolish the Electoral College — more than any other constitutional issue.",
+      "evidence": "Congressional Research Service records. The most popular alternative is the National Popular Vote Interstate Compact.",
+      "source_url": "https://www.ncsl.org/elections-and-campaigns/electoral-college",
+      "source_name": "National Conference of State Legislatures",
+      "date": "2024-03-01",
+      "confidence": 0.88
+    }
+  ],
+  "visual_leads": [
+    {
+      "url": "https://www.archives.gov/files/electoral-college/2016-map.png",
+      "description": "2016 electoral map showing state-by-state results",
+      "suggested_crop": "Full map with state labels highlighted"
+    },
+    {
+      "url": "https://www.census.gov/content/dam/Census/library/visualizations/2020/dec/2020-apportionment-map.jpg",
+      "description": "US population density map for electoral power comparison",
+      "suggested_crop": "Highlight CA vs WY population contrast"
+    }
+  ],
+  "contested_flags": [
+    {
+      "claim": "The Electoral College protects small states from being ignored in presidential campaigns",
+      "counter_claim": "In practice, candidates spend almost all their time in ~10 swing states, ignoring both small safe states and large safe states equally.",
+      "resolution": "Both perspectives have merit. Small-state protection was the design intent, but swing-state concentration is the observed outcome."
+    },
+    {
+      "claim": "Without the Electoral College, candidates would only campaign in big cities",
+      "counter_claim": "The current system concentrates campaigning in swing states. A national popular vote would make every vote in every state equally valuable.",
+      "resolution": "Debated outcome. The National Popular Vote Interstate Compact represents one proposed solution."
+    }
+  ]
+}
