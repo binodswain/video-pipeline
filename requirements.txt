@@ -1,0 +1,21 @@
+# Video Pipeline Dependencies
+# Pinned for reproducible builds
+
+# Web research (researcher.py)
+ddgs>=1.0,<2.0           # DuckDuckGo search (renamed from duckduckgo_search)
+trafilatura>=1.0,<2.0    # Web content extraction
+lxml_html_clean>=0.1,<1.0  # HTML cleaning (trafilatura dependency)
+beautifulsoup4>=4.12,<5.0  # HTML/XML parsing
+requests>=2.31,<3.0      # HTTP client
+
+# Video assembly (build_video.py, walks, subtitles)
+moviepy>=2.0,<3.0        # Video editing (v2 API)
+Pillow>=10.0,<12.0       # Image processing
+numpy>=1.24,<2.0         # Numerical arrays
+
+# TTS (utils/tts.py)
+kokoro>=0.6,<1.0         # Kokoro-82M TTS model
+soundfile>=0.12,<0.13    # Audio file I/O
+
+# Slide generation (optional)
+python-pptx>=0.6.21,<1.0  # PowerPoint slide export
